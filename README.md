@@ -2,7 +2,7 @@
 
 A single-page dashboard for tracking job applications: status, dates, sources, follow-ups, and notes — all in one place, with a bulk import from Excel/CSV.
 
-**Live demo:** https://YOUR-USERNAME.github.io/job-application-tracker/
+**Live demo:** https://siddik238.github.io/Job-Application-Tracker/
 
 ## Features
 
@@ -36,7 +36,7 @@ This is a single static file, so any of these work:
 
 1. Fork or clone this repo
 2. In the repo settings on GitHub, go to **Pages** → set the source branch to `main` (root)
-3. GitHub will publish it at `https://YOUR-USERNAME.github.io/job-application-tracker/` within a minute or two
+3. GitHub will publish it at `https://YOUR-USERNAME.github.io/Job-Application-Tracker/` within a minute or two
 
 ## Data & privacy
 
