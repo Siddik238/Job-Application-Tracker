@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Application Pipeline — Job Application Tracker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#F4F6F8; --surface:#FFFFFF; --surface-2:#EDF1F4; --border:#DCE2E8;
+    --ink:#16212B; --ink-muted:#5B6773; --ink-faint:#8B95A1;
+    --accent:#116F67; --accent-ink:#0B4F49; --accent-soft:#E1F3F1; --accent-soft-border:#BFE4DF;
+    --danger:#B0362E; --danger-soft:#FBE7E7;
+    --st-applied-bg:#E7ECF7; --st-applied-fg:#3853A4;
+    --st-interview-bg:#FCEFD9; --st-interview-fg:#93611A;
+    --st-offer-bg:#E3F5E9; --st-offer-fg:#1F7A44;
+    --st-rejected-bg:#FBE9E8; --st-rejected-fg:#AE3A31;
+    --st-withdrawn-bg:#EDF0F2; --st-withdrawn-fg:#69727C;
+    --st-ghosted-bg:#EEEAF8; --st-ghosted-fg:#6551A8;
+    --shadow: 0 1px 2px rgba(20,30,40,0.06), 0 8px 24px -12px rgba(20,30,40,0.12);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#10151A; --surface:#171E24; --surface-2:#1E262D; --border:#2A333B;
+      --ink:#E7ECEF; --ink-muted:#9FACB8; --ink-faint:#6E7A85;
+      --accent:#3FD9C7; --accent-ink:#8FEFE3; --accent-soft:rgba(63,217,199,0.14); --accent-soft-border:rgba(63,217,199,0.32);
+      --danger:#F1948B; --danger-soft:rgba(224,90,80,0.16);
+      --st-applied-bg:rgba(93,130,220,0.18); --st-applied-fg:#A9C0F5;
+      --st-interview-bg:rgba(230,166,63,0.18); --st-interview-fg:#F2C67F;
+      --st-offer-bg:rgba(63,199,120,0.18); --st-offer-fg:#84E6A9;
+      --st-rejected-bg:rgba(224,90,80,0.18); --st-rejected-fg:#F1978E;
+      --st-withdrawn-bg:rgba(150,160,170,0.18); --st-withdrawn-fg:#BCC5CD;
+      --st-ghosted-bg:rgba(151,120,230,0.18); --st-ghosted-fg:#C4B5F2;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#10151A; --surface:#171E24; --surface-2:#1E262D; --border:#2A333B;
+    --ink:#E7ECEF; --ink-muted:#9FACB8; --ink-faint:#6E7A85;
+    --accent:#3FD9C7; --accent-ink:#8FEFE3; --accent-soft:rgba(63,217,199,0.14); --accent-soft-border:rgba(63,217,199,0.32);
+    --danger:#F1948B; --danger-soft:rgba(224,90,80,0.16);
+    --st-applied-bg:rgba(93,130,220,0.18); --st-applied-fg:#A9C0F5;
+    --st-interview-bg:rgba(230,166,63,0.18); --st-interview-fg:#F2C67F;
+    --st-offer-bg:rgba(63,199,120,0.18); --st-offer-fg:#84E6A9;
+    --st-rejected-bg:rgba(224,90,80,0.18); --st-rejected-fg:#F1978E;
+    --st-withdrawn-bg:rgba(150,160,170,0.18); --st-withdrawn-fg:#BCC5CD;
+    --st-ghosted-bg:rgba(151,120,230,0.18); --st-ghosted-fg:#C4B5F2;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    color-scheme: dark;
+  }
+
+  [hidden]{ display:none !important; }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,sans-serif; }
+  .mono{ font-family:"IBM Plex Mono","SFMono-Regular",Consolas,monospace; font-variant-numeric:tabular-nums; }
+  .wrap{ max-width:1080px; margin:0 auto; padding:24px 16px 64px; }
+
+  a{ color:var(--accent-ink); }
+
+  /* header */
+  .topbar{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:nowrap; margin-bottom:22px; }
+  .topbar h1{ font-size:22px; font-weight:700; margin:0; letter-spacing:-0.01em; white-space:nowrap; }
+  .actions{ display:flex; gap:8px; flex-wrap:nowrap; min-width:0; overflow-x:auto; padding:2px; margin:-2px; scrollbar-width:thin; }
+  .actions .btn{ flex:none; }
+  .actions::-webkit-scrollbar{ height:5px; }
+  .actions::-webkit-scrollbar-thumb{ background:var(--border); border-radius:3px; }
+  @media (max-width:640px){
+    .btn-label{ display:none; }
+    .actions .btn{ padding:9px; }
+  }
+  @media (max-width:420px){
+    .topbar{ flex-wrap:wrap; }
+    .actions{ flex-wrap:wrap; overflow-x:visible; }
+  }
+
+  button{ font-family:inherit; font-size:13.5px; cursor:pointer; }
+  .btn{ display:inline-flex; align-items:center; gap:6px; border-radius:9px; padding:9px 14px; font-weight:600; border:1px solid var(--border); background:var(--surface); color:var(--ink); transition:background .12s,border-color .12s; }
+  .btn:hover{ background:var(--surface-2); }
+  .btn:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .btn-primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn-primary:hover{ filter:brightness(1.05); background:var(--accent); }
+  .btn-danger{ background:var(--danger); border-color:var(--danger); color:#fff; }
+  .btn-ghost{ background:transparent; border-color:transparent; padding:6px 8px; color:var(--ink-muted); }
+  .btn-ghost:hover{ background:var(--surface-2); color:var(--ink); }
+  .btn-sm{ padding:6px 10px; font-size:12.5px; border-radius:7px; }
+
+  /* stat tiles */
+  .stats{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:14px; }
+  .stat{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; box-shadow:var(--shadow); text-align:center; }
+  .stat .label{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); margin-bottom:6px; }
+  .stat .value{ font-size:26px; font-weight:700; letter-spacing:-0.01em; }
+  .stat .sub{ font-size:12px; color:var(--ink-muted); margin-top:2px; }
+
+  /* breakdown card */
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; box-shadow:var(--shadow); margin-bottom:14px; }
+  .card h2{ font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); margin:0 0 12px; }
+  .bar{ display:flex; height:10px; border-radius:5px; overflow:hidden; background:var(--surface-2); gap:2px; }
+  .bar .seg{ height:100%; min-width:3px; }
+  .legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; }
+  .legend .item{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-muted); }
+  .legend .dot{ width:8px; height:8px; border-radius:2px; flex:none; }
+  .legend b{ color:var(--ink); font-weight:600; }
+
+  /* filters */
+  .filters{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .search{ flex:1; min-width:180px; border:1px solid var(--border); background:var(--surface); border-radius:9px; padding:9px 12px; font-size:13.5px; color:var(--ink); }
+  .pill{ border:1px solid var(--border); background:var(--surface); color:var(--ink-muted); border-radius:999px; padding:7px 13px; font-size:12.5px; font-weight:600; white-space:nowrap; }
+  .pill[aria-pressed="true"]{ background:var(--accent-soft); border-color:var(--accent-soft-border); color:var(--accent-ink); }
+
+  /* status pill (data) */
+  .status{ display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:3px 10px; font-size:12px; font-weight:600; white-space:nowrap; }
+  .status .dot{ width:6px; height:6px; border-radius:50%; }
+  .status.applied{ background:var(--st-applied-bg); color:var(--st-applied-fg); }
+  .status.applied .dot{ background:var(--st-applied-fg); }
+  .status.interview{ background:var(--st-interview-bg); color:var(--st-interview-fg); }
+  .status.interview .dot{ background:var(--st-interview-fg); }
+  .status.offer{ background:var(--st-offer-bg); color:var(--st-offer-fg); }
+  .status.offer .dot{ background:var(--st-offer-fg); }
+  .status.rejected{ background:var(--st-rejected-bg); color:var(--st-rejected-fg); }
+  .status.rejected .dot{ background:var(--st-rejected-fg); }
+  .status.withdrawn{ background:var(--st-withdrawn-bg); color:var(--st-withdrawn-fg); }
+  .status.withdrawn .dot{ background:var(--st-withdrawn-fg); }
+  .status.ghosted{ background:var(--st-ghosted-bg); color:var(--st-ghosted-fg); }
+  .status.ghosted .dot{ background:var(--st-ghosted-fg); }
+
+  .example-tag{ display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-faint); border:1px dashed var(--ink-faint); border-radius:5px; padding:1px 6px; margin-left:8px; vertical-align:middle; }
+  .banner{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:var(--accent-soft); border:1px solid var(--accent-soft-border); color:var(--accent-ink); border-radius:10px; padding:10px 14px; font-size:13px; margin-bottom:14px; }
+
+  /* table */
+  .table-wrap{ background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); overflow:hidden; }
+  table{ width:100%; border-collapse:collapse; }
+  thead th{ text-align:left; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-faint); padding:11px 14px; border-bottom:1px solid var(--border); background:var(--surface-2); }
+  tbody td{ padding:12px 14px; border-bottom:1px solid var(--border); font-size:13.5px; vertical-align:middle; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover{ background:var(--surface-2); }
+  .role-cell .company{ font-weight:600; color:var(--ink); }
+  .role-cell .role{ color:var(--ink-muted); font-size:12.5px; margin-top:1px; }
+  .role-cell .company-btn{ all:unset; cursor:pointer; font-weight:600; color:var(--ink); font-family:inherit; font-size:inherit; display:inline-flex; align-items:center; gap:5px; border-radius:4px; }
+  .role-cell .company-btn:hover{ color:var(--accent-ink); text-decoration:underline; text-underline-offset:3px; }
+  .role-cell .company-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .note-icon{ width:13px; height:13px; color:var(--ink-faint); flex:none; }
+  .notes-pop{ position:fixed; z-index:70; max-width:300px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; box-shadow:0 16px 40px -12px rgba(0,0,0,0.3); }
+  .notes-pop .notes-pop-title{ font-weight:700; font-size:13px; margin-bottom:6px; }
+  .notes-pop .notes-pop-body{ font-size:13px; color:var(--ink-muted); white-space:pre-wrap; line-height:1.45; }
+  .muted{ color:var(--ink-faint); }
+  .followup.due{ color:var(--st-interview-fg); font-weight:600; }
+  .link-icon{ color:var(--ink-muted); text-decoration:none; }
+  .link-icon:hover{ color:var(--accent-ink); }
+  .row-actions{ display:flex; gap:2px; justify-content:flex-end; }
+  .confirm-inline{ display:flex; gap:6px; justify-content:flex-end; }
+
+  .empty{ padding:48px 20px; text-align:center; color:var(--ink-muted); }
+  .empty .big{ font-size:15px; font-weight:600; color:var(--ink); margin-bottom:6px; }
+
+  /* modal */
+  .overlay{ position:fixed; inset:0; background:rgba(10,14,18,0.5); display:flex; align-items:flex-start; justify-content:center; padding:24px 16px; overflow-y:auto; z-index:50; }
+  .modal{ background:var(--surface); border:1px solid var(--border); border-radius:14px; width:100%; max-width:520px; padding:22px; margin-top:24px; box-shadow:0 24px 64px -20px rgba(0,0,0,0.35); }
+  .modal h2{ font-size:16px; font-weight:700; margin:0 0 16px; }
+  .field{ margin-bottom:13px; }
+  .field label{ display:block; font-size:12px; font-weight:600; color:var(--ink-muted); margin-bottom:5px; }
+  .field input, .field select, .field textarea{ width:100%; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:9px 11px; font-size:13.5px; font-family:inherit; }
+  .field textarea{ resize:vertical; min-height:56px; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+
+  svg.icon{ width:15px; height:15px; display:block; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+
+  @media (max-width: 700px){
+    table, thead, tbody, tr, td{ display:block; width:100%; }
+    thead{ display:none; }
+    tbody tr{ border:1px solid var(--border); border-radius:10px; margin:10px; padding:4px 12px; }
+    tbody tr:hover{ background:var(--surface); }
+    .table-wrap{ background:transparent; border:none; box-shadow:none; }
+    tbody td{ border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 2px; }
+    tbody tr td:last-child{ border-bottom:none; }
+    tbody td[data-label]::before{ content:attr(data-label); font-size:11px; font-weight:600; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.03em; }
+    td.role-cell{ display:block; padding:12px 2px 8px; }
+    .row2{ grid-template-columns:1fr; }
+  }
+
+  /* import */
+  .modal-wide{ max-width:640px; }
+  .import-hint{ font-size:13px; color:var(--ink-muted); margin:0 0 10px; }
+  .import-summary{ font-size:13px; color:var(--ink); background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:8px 12px; margin-bottom:12px; }
+  .table-scroll{ overflow-x:auto; border:1px solid var(--border); border-radius:8px; margin-bottom:4px; max-height:260px; }
+  .map-table, .preview-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .map-table th, .preview-table th{ text-align:left; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-faint); padding:8px 10px; background:var(--surface-2); border-bottom:1px solid var(--border); white-space:nowrap; position:sticky; top:0; }
+  .map-table td, .preview-table td{ padding:7px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  .map-table tr:last-child td, .preview-table tr:last-child td{ border-bottom:none; }
+  .map-table select{ border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:6px; padding:5px 7px; font-size:12.5px; font-family:inherit; }
+  .row-skip{ opacity:.55; }
+  .progress-track{ height:8px; border-radius:4px; background:var(--surface-2); overflow:hidden; margin-bottom:8px; }
+  .progress-fill{ height:100%; background:var(--accent); width:0%; transition:width .15s; }
+  .toast{ position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:var(--ink); color:var(--bg); font-size:13px; font-weight:600; padding:10px 18px; border-radius:999px; box-shadow:var(--shadow); z-index:60; max-width:90vw; text-align:center; }
+  @media (max-width:700px){ .modal-wide{ max-width:100%; } }
+
+  .local-note{ font-size:12px; color:var(--ink-faint); text-align:center; margin-top:18px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>Application Pipeline</h1>
+    </div>
+    <div class="actions">
+      <button class="btn" id="importBtn" type="button" aria-label="Import from Excel/CSV">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
+        <span class="btn-label">Import from Excel/CSV</span>
+      </button>
+      <button class="btn" id="exportBtn" type="button" aria-label="Export CSV">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M4 19h16"/></svg>
+        <span class="btn-label">Export CSV</span>
+      </button>
+      <button class="btn btn-primary" id="addBtn" type="button" aria-label="Add application">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        <span class="btn-label">Add application</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+  <div class="card" id="breakdownCard" hidden>
+    <h2>Pipeline breakdown</h2>
+    <div class="bar" id="breakdownBar"></div>
+    <div class="legend" id="breakdownLegend"></div>
+  </div>
+
+  <div class="banner" id="exampleBanner" hidden>
+    <span>These 3 rows are examples so you can see how it works — edit them or clear them out and add your own.</span>
+    <button class="btn btn-sm" id="clearExamplesBtn" type="button">Clear example rows</button>
+  </div>
+
+  <div class="filters">
+    <input class="search" id="searchInput" type="text" placeholder="Search company or role…" autocomplete="off">
+    <div class="filters" id="statusFilters" style="margin:0;"></div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="appTable">
+      <thead>
+        <tr>
+          <th>Role</th><th>Status</th><th>Applied</th><th>Follow-up</th><th>Source</th><th>Link</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="empty" id="emptyState" hidden>
+      <div class="big">No applications yet</div>
+      <div>Add your first one to start tracking your pipeline.</div>
+    </div>
+  </div>
+
+  <div class="local-note">Your data is stored locally in this browser only (localStorage) — nothing is sent to a server, and it won't sync across devices or browsers.</div>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="modal">
+    <h2 id="modalTitle">Add application</h2>
+    <form id="appForm">
+      <div class="row2">
+        <div class="field"><label for="f-company">Company *</label><input id="f-company" required></div>
+        <div class="field"><label for="f-role">Role *</label><input id="f-role" required></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="f-status">Status</label>
+          <select id="f-status">
+            <option value="applied">Applied</option>
+            <option value="ghosted">Ghosted</option>
+            <option value="interview">Interview</option>
+            <option value="offer">Offer</option>
+            <option value="rejected">Rejected</option>
+            <option value="withdrawn">Withdrawn</option>
+          </select>
+        </div>
+        <div class="field"><label for="f-source">Source</label><input id="f-source" placeholder="LinkedIn, Seek, referral…"></div>
+      </div>
+      <div class="field"><label for="f-date">Date applied *</label><input id="f-date" type="date" required></div>
+      <div class="field"><label for="f-link">Job link</label><input id="f-link" type="url" placeholder="https://…"></div>
+      <div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" placeholder="Contact name, interview notes, reference number…"></textarea></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="saveBtn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="overlay" id="importOverlay" hidden>
+  <div class="modal modal-wide">
+    <h2>Import applications</h2>
+    <div id="importStep1"></div>
+    <div id="importStep2" hidden>
+      <div class="import-summary" id="importSummary"></div>
+      <div class="table-scroll">
+        <table class="map-table" id="mapTable"></table>
+      </div>
+      <div class="row2" style="margin-top:14px;">
+        <div class="field"><label for="i-default-status">Default status (rows with none)</label>
+          <select id="i-default-status">
+            <option value="applied">Applied</option>
+            <option value="ghosted">Ghosted</option>
+            <option value="interview">Interview</option>
+            <option value="offer">Offer</option>
+            <option value="rejected">Rejected</option>
+            <option value="withdrawn">Withdrawn</option>
+          </select>
+        </div>
+        <div class="field"><label for="i-default-date">Default date applied (rows with none)</label><input id="i-default-date" type="date"></div>
+      </div>
+      <div class="import-hint" id="previewHint"></div>
+      <div class="table-scroll">
+        <table class="preview-table" id="previewTable"></table>
+      </div>
+    </div>
+    <div id="importProgress" hidden>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="import-hint" id="progressLabel">Importing…</div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="importCancelBtn">Cancel</button>
+      <button type="button" class="btn btn-primary" id="importConfirmBtn" hidden>Import</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="importFile" accept=".xlsx,.xls,.csv" hidden>
+<div class="toast" id="toast" hidden></div>
+<div class="notes-pop" id="notesPop" hidden role="dialog" aria-label="Notes">
+  <div class="notes-pop-title" id="notesPopTitle"></div>
+  <div class="notes-pop-body" id="notesPopBody"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function(){
+  var STORAGE_KEY = "applicationPipelineData";
+
+  var STATUSES = ["applied","ghosted","interview","offer","rejected","withdrawn"];
+  var STATUS_LABEL = { applied:"Applied", ghosted:"Ghosted", interview:"Interview", offer:"Offer", rejected:"Rejected", withdrawn:"Withdrawn" };
+  var STATUS_VAR = { applied:"--st-applied-fg", ghosted:"--st-ghosted-fg", interview:"--st-interview-fg", offer:"--st-offer-fg", rejected:"--st-rejected-fg", withdrawn:"--st-withdrawn-fg" };
+  var GHOST_AFTER_DAYS = 30;
+
+  var docs = [];
+  var filterStatus = "all";
+  var searchQuery = "";
+  var confirmingDeleteId = null;
+
+  var tableBody = document.getElementById("tableBody");
+  var emptyState = document.getElementById("emptyState");
+  var statsEl = document.getElementById("stats");
+  var breakdownCard = document.getElementById("breakdownCard");
+  var breakdownBar = document.getElementById("breakdownBar");
+  var breakdownLegend = document.getElementById("breakdownLegend");
+  var exampleBanner = document.getElementById("exampleBanner");
+  var statusFiltersEl = document.getElementById("statusFilters");
+
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function todayISO(){
+    var d = new Date();
+    var tz = d.getTimezoneOffset() * 60000;
+    return new Date(d - tz).toISOString().slice(0,10);
+  }
+  function daysAgo(n){
+    var d = new Date();
+    d.setDate(d.getDate() - n);
+    var tz = d.getTimezoneOffset() * 60000;
+    return new Date(d - tz).toISOString().slice(0,10);
+  }
+  function fmtDate(iso){
+    if(!iso) return "—";
+    var parts = iso.split("-");
+    if(parts.length !== 3) return iso;
+    var d = new Date(Number(parts[0]), Number(parts[1])-1, Number(parts[2]));
+    return d.toLocaleDateString(undefined, { day:"numeric", month:"short" });
+  }
+  function addDays(iso, n){
+    if(!iso) return "";
+    var parts = iso.split("-");
+    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    if(isNaN(d)) return "";
+    d.setDate(d.getDate() + n);
+    var tz = d.getTimezoneOffset() * 60000;
+    return new Date(d - tz).toISOString().slice(0,10);
+  }
+  function newId(){
+    if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "id-" + Date.now() + "-" + Math.random().toString(36).slice(2,9);
+  }
+
+  // ---- local storage persistence ----
+  function exampleSeed(){
+    return [
+      { id:newId(), company:"Horizon Health Group", role:"Service Desk Analyst", status:"interview", dateApplied:daysAgo(6), followUpDate:daysAgo(3), resumeVariant:"", source:"Seek", link:"", notes:"Phone screen booked for next week.", isExample:true },
+      { id:newId(), company:"Bluewave Technologies", role:"Help Desk Analyst", status:"applied", dateApplied:daysAgo(3), followUpDate:addDays(daysAgo(3),3), resumeVariant:"", source:"LinkedIn", link:"", notes:"Applied via company site, no ATS confirmation yet.", isExample:true },
+      { id:newId(), company:"Meridian Financial Services", role:"IT Support Officer", status:"rejected", dateApplied:daysAgo(26), followUpDate:"", resumeVariant:"", source:"Referral", link:"", notes:"Went with an internal candidate.", isExample:true }
+    ];
+  }
+  function loadDocs(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw === null){
+        var seed = exampleSeed();
+        saveDocs(seed);
+        return seed;
+      }
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    }catch(e){ return []; }
+  }
+  function saveDocs(arr){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); return true; }
+    catch(e){ showToast("Couldn't save — this browser's local storage may be full or disabled."); return false; }
+  }
+  function sortDocs(){
+    docs.sort(function(a,b){ return (b.dateApplied||"").localeCompare(a.dateApplied||""); });
+  }
+
+  // ---- status filter pills ----
+  function renderFilterPills(){
+    var html = '<button type="button" class="pill" data-status="all" aria-pressed="' + (filterStatus==="all") + '">All</button>';
+    STATUSES.forEach(function(s){
+      html += '<button type="button" class="pill" data-status="' + s + '" aria-pressed="' + (filterStatus===s) + '">' + STATUS_LABEL[s] + '</button>';
+    });
+    statusFiltersEl.innerHTML = html;
+  }
+  statusFiltersEl.addEventListener("click", function(e){
+    var btn = e.target.closest("[data-status]");
+    if(!btn) return;
+    filterStatus = btn.getAttribute("data-status");
+    renderFilterPills();
+    render();
+  });
+  document.getElementById("searchInput").addEventListener("input", function(e){
+    searchQuery = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  // ---- stats + breakdown ----
+  function renderStats(){
+    var total = docs.length;
+    var active = docs.filter(function(d){ return d.status === "applied" || d.status === "interview"; }).length;
+    var interviews = docs.filter(function(d){ return d.status === "interview" || d.status === "offer"; }).length;
+    var offers = docs.filter(function(d){ return d.status === "offer"; }).length;
+    var ghosted = docs.filter(function(d){ return d.status === "ghosted"; }).length;
+    var responded = docs.filter(function(d){ return ["interview","offer","rejected"].indexOf(d.status) !== -1; }).length;
+    var responseRate = total ? Math.round((responded/total)*100) : null;
+    var since = daysAgo(6);
+    var thisWeek = docs.filter(function(d){ return d.dateApplied && d.dateApplied >= since; }).length;
+
+    var tiles = [
+      { label:"Total applications", value:total },
+      { label:"Active", value:active, sub: interviews ? interviews + " in interview or later" : "" },
+      { label:"Offers", value:offers },
+      { label:"Ghosted", value:ghosted },
+      { label:"Response rate", value: responseRate===null ? "—" : responseRate + "%" },
+      { label:"Applied this week", value:thisWeek }
+    ];
+    statsEl.innerHTML = tiles.map(function(t){
+      return '<div class="stat"><div class="label">'+esc(t.label)+'</div><div class="value mono">'+esc(t.value)+'</div>' +
+             (t.sub ? '<div class="sub">'+esc(t.sub)+'</div>' : '') + '</div>';
+    }).join("");
+
+    if(total === 0){ breakdownCard.hidden = true; return; }
+    breakdownCard.hidden = false;
+    var counts = {};
+    STATUSES.forEach(function(s){ counts[s] = 0; });
+    docs.forEach(function(d){ if(counts[d.status] != null) counts[d.status]++; });
+    breakdownBar.innerHTML = STATUSES.filter(function(s){ return counts[s] > 0; }).map(function(s){
+      var pct = (counts[s]/total*100);
+      return '<div class="seg" style="width:'+pct+'%; background:var('+STATUS_VAR[s]+')" title="'+STATUS_LABEL[s]+': '+counts[s]+'"></div>';
+    }).join("");
+    breakdownLegend.innerHTML = STATUSES.map(function(s){
+      return '<span class="item"><span class="dot" style="background:var('+STATUS_VAR[s]+')"></span>' + STATUS_LABEL[s] + ' <b>' + counts[s] + '</b></span>';
+    }).join("");
+  }
+
+  // ---- table ----
+  function isFollowUpDue(d){
+    if(!d.followUpDate) return false;
+    if(d.status !== "applied" && d.status !== "interview") return false;
+    return d.followUpDate <= todayISO();
+  }
+
+  function render(){
+    renderStats();
+
+    var hasExamples = docs.some(function(d){ return d.isExample; });
+    exampleBanner.hidden = !hasExamples;
+
+    var filtered = docs.filter(function(d){
+      if(filterStatus !== "all" && d.status !== filterStatus) return false;
+      if(searchQuery){
+        var hay = ((d.company||"") + " " + (d.role||"")).toLowerCase();
+        if(hay.indexOf(searchQuery) === -1) return false;
+      }
+      return true;
+    });
+
+    if(docs.length === 0){
+      emptyState.hidden = false;
+      tableBody.innerHTML = "";
+      return;
+    }
+    emptyState.hidden = true;
+
+    if(filtered.length === 0){
+      tableBody.innerHTML = '<tr><td colspan="7" style="padding:32px 14px; text-align:center; color:var(--ink-muted);">No applications match this filter.</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = filtered.map(function(d){
+      var hasNotes = !!(d.notes && d.notes.trim());
+      var noteIcon = hasNotes ? '<svg class="icon note-icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>' : '';
+      var due = isFollowUpDue(d);
+      var link = d.link ? '<a class="link-icon" href="'+esc(d.link)+'" target="_blank" rel="noopener" aria-label="Open job link"><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></a>' : '<span class="muted">—</span>';
+      var actions;
+      if(confirmingDeleteId === d.id){
+        actions = '<div class="confirm-inline">' +
+          '<button type="button" class="btn btn-sm btn-danger" data-confirm-delete="'+d.id+'">Delete</button>' +
+          '<button type="button" class="btn btn-sm" data-cancel-delete="1">Cancel</button></div>';
+      } else {
+        actions = '<div class="row-actions">' +
+          '<button type="button" class="btn-ghost" data-edit="'+d.id+'" aria-label="Edit"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
+          '<button type="button" class="btn-ghost" data-delete="'+d.id+'" aria-label="Delete"><svg class="icon" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg></button></div>';
+      }
+      return '<tr>' +
+        '<td class="role-cell"><button type="button" class="company-btn" data-notes-id="'+d.id+'">'+esc(d.company)+noteIcon+'</button>'+(d.isExample ? '<span class="example-tag">Example</span>' : '')+'<div class="role">'+esc(d.role)+'</div></td>' +
+        '<td data-label="Status"><span class="status '+d.status+'"><span class="dot"></span>'+STATUS_LABEL[d.status]+'</span></td>' +
+        '<td data-label="Applied" class="mono">'+fmtDate(d.dateApplied)+'</td>' +
+        '<td data-label="Follow-up" class="mono'+(due?' followup due':'')+'">'+fmtDate(d.followUpDate)+'</td>' +
+        '<td data-label="Source">'+(d.source ? esc(d.source) : '<span class="muted">—</span>')+'</td>' +
+        '<td data-label="Link">'+link+'</td>' +
+        '<td data-label="">'+actions+'</td>' +
+        '</tr>';
+    }).join("");
+  }
+
+  // ---- notes popover ----
+  var notesPop = document.getElementById("notesPop");
+  var notesPopTitle = document.getElementById("notesPopTitle");
+  var notesPopBody = document.getElementById("notesPopBody");
+
+  function hideNotesPopover(){ notesPop.hidden = true; notesPop.removeAttribute("data-open-for"); }
+
+  function showNotesPopover(trigger, d){
+    notesPopTitle.textContent = d.company + (d.role ? " — " + d.role : "");
+    notesPopBody.textContent = (d.notes && d.notes.trim()) ? d.notes : "No notes added for this application yet.";
+    notesPop.hidden = false;
+    notesPop.setAttribute("data-open-for", d.id);
+    var rect = trigger.getBoundingClientRect();
+    var popRect = notesPop.getBoundingClientRect();
+    var left = Math.min(rect.left, window.innerWidth - popRect.width - 12);
+    left = Math.max(12, left);
+    var top = rect.bottom + 8;
+    if(top + popRect.height > window.innerHeight - 12){
+      top = rect.top - popRect.height - 8;
+      if(top < 12) top = 12;
+    }
+    notesPop.style.left = left + "px";
+    notesPop.style.top = top + "px";
+  }
+
+  document.addEventListener("click", function(e){
+    if(notesPop.hidden) return;
+    if(notesPop.contains(e.target)) return;
+    if(e.target.closest("[data-notes-id]")) return;
+    hideNotesPopover();
+  });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") hideNotesPopover(); });
+  window.addEventListener("scroll", hideNotesPopover, true);
+  window.addEventListener("resize", hideNotesPopover);
+
+  tableBody.addEventListener("click", function(e){
+    var notesBtn = e.target.closest("[data-notes-id]");
+    var editBtn = e.target.closest("[data-edit]");
+    var delBtn = e.target.closest("[data-delete]");
+    var confirmBtn = e.target.closest("[data-confirm-delete]");
+    var cancelBtn = e.target.closest("[data-cancel-delete]");
+    if(notesBtn){
+      var nid = notesBtn.getAttribute("data-notes-id");
+      if(notesPop.getAttribute("data-open-for") === nid && !notesPop.hidden){ hideNotesPopover(); return; }
+      var nd = docs.find(function(x){ return x.id === nid; });
+      if(nd) showNotesPopover(notesBtn, nd);
+      return;
+    }
+    if(editBtn){ openForm(editBtn.getAttribute("data-edit")); return; }
+    if(delBtn){ confirmingDeleteId = delBtn.getAttribute("data-delete"); render(); return; }
+    if(confirmBtn){
+      var id = confirmBtn.getAttribute("data-confirm-delete");
+      confirmingDeleteId = null;
+      docs = docs.filter(function(x){ return x.id !== id; });
+      saveDocs(docs);
+      render();
+      return;
+    }
+    if(cancelBtn){ confirmingDeleteId = null; render(); return; }
+  });
+
+  // ---- clear examples ----
+  var clearBtn = document.getElementById("clearExamplesBtn");
+  var clearArmed = false;
+  clearBtn.addEventListener("click", function(){
+    if(!clearArmed){
+      clearArmed = true;
+      clearBtn.textContent = "Click again to confirm";
+      setTimeout(function(){ clearArmed = false; clearBtn.textContent = "Clear example rows"; }, 4000);
+      return;
+    }
+    clearArmed = false;
+    clearBtn.textContent = "Clear example rows";
+    docs = docs.filter(function(d){ return !d.isExample; });
+    saveDocs(docs);
+    render();
+  });
+
+  // ---- add / edit form ----
+  var overlay = document.getElementById("overlay");
+  var form = document.getElementById("appForm");
+  var modalTitle = document.getElementById("modalTitle");
+  var editingId = null;
+
+  function openForm(id){
+    editingId = id || null;
+    var d = id ? docs.find(function(x){ return x.id === id; }) : null;
+    modalTitle.textContent = d ? "Edit application" : "Add application";
+    document.getElementById("f-company").value = d ? (d.company||"") : "";
+    document.getElementById("f-role").value = d ? (d.role||"") : "";
+    document.getElementById("f-status").value = d ? (d.status||"applied") : "applied";
+    document.getElementById("f-source").value = d ? (d.source||"") : "";
+    document.getElementById("f-date").value = d ? (d.dateApplied||"") : todayISO();
+    document.getElementById("f-link").value = d ? (d.link||"") : "";
+    document.getElementById("f-notes").value = d ? (d.notes||"") : "";
+    overlay.hidden = false;
+    document.getElementById("f-company").focus();
+  }
+  function closeForm(){ overlay.hidden = true; editingId = null; form.reset(); }
+
+  document.getElementById("addBtn").addEventListener("click", function(){ openForm(null); });
+  document.getElementById("cancelBtn").addEventListener("click", closeForm);
+  overlay.addEventListener("click", function(e){ if(e.target === overlay) closeForm(); });
+
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    var payload = {
+      company: document.getElementById("f-company").value.trim(),
+      role: document.getElementById("f-role").value.trim(),
+      status: document.getElementById("f-status").value,
+      source: document.getElementById("f-source").value.trim(),
+      dateApplied: document.getElementById("f-date").value,
+      link: document.getElementById("f-link").value.trim(),
+      notes: document.getElementById("f-notes").value.trim()
+    };
+    if(!payload.company || !payload.role || !payload.dateApplied) return;
+    payload.followUpDate = addDays(payload.dateApplied, 3);
+    if(editingId){
+      var idx = docs.findIndex(function(x){ return x.id === editingId; });
+      if(idx !== -1) docs[idx] = Object.assign({}, docs[idx], payload);
+    } else {
+      payload.id = newId();
+      docs.push(payload);
+    }
+    saveDocs(docs);
+    sortDocs();
+    render();
+    autoGhostCheck();
+    closeForm();
+  });
+
+  // ---- CSV export (plain browser download, no account needed) ----
+  document.getElementById("exportBtn").addEventListener("click", function(){
+    var headers = ["Company","Role","Status","Date applied","Follow-up date","Source","Link","Notes"];
+    var rows = docs.map(function(d){
+      return [d.company,d.role,STATUS_LABEL[d.status]||d.status,d.dateApplied,d.followUpDate,d.source,d.link,d.notes];
+    });
+    function csvCell(v){
+      v = v == null ? "" : String(v);
+      if(/[",\n]/.test(v)) v = '"' + v.replace(/"/g,'""') + '"';
+      return v;
+    }
+    var csv = [headers].concat(rows).map(function(r){ return r.map(csvCell).join(","); }).join("\n");
+    var blob = new Blob([csv], { type:"text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = "application-pipeline.csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  });
+
+  // ---- bulk import from Excel/CSV ----
+  var importFileInput = document.getElementById("importFile");
+  var importBtn = document.getElementById("importBtn");
+  var importOverlay = document.getElementById("importOverlay");
+  var importStep1 = document.getElementById("importStep1");
+  var importStep2 = document.getElementById("importStep2");
+  var importProgress = document.getElementById("importProgress");
+  var importCancelBtn = document.getElementById("importCancelBtn");
+  var importConfirmBtn = document.getElementById("importConfirmBtn");
+  var mapTable = document.getElementById("mapTable");
+  var previewTable = document.getElementById("previewTable");
+  var importSummary = document.getElementById("importSummary");
+  var previewHint = document.getElementById("previewHint");
+  var defaultStatusSel = document.getElementById("i-default-status");
+  var defaultDateInput = document.getElementById("i-default-date");
+  var toastEl = document.getElementById("toast");
+  var toastTimer = null;
+
+  var TARGET_FIELDS = [
+    { key:"", label:"— Ignore —" },
+    { key:"company", label:"Company" },
+    { key:"role", label:"Role" },
+    { key:"status", label:"Status" },
+    { key:"dateApplied", label:"Date applied" },
+    { key:"source", label:"Source" },
+    { key:"link", label:"Link" },
+    { key:"notes", label:"Notes" }
+  ];
+  var GUESS = {
+    company: /company|employer|organi[sz]ation/i,
+    role: /role|position|title/i,
+    status: /status|stage/i,
+    dateApplied: /date.?applied|applied.?date|application.?date|^date$/i,
+    source: /source|platform|found via|\bvia\b/i,
+    link: /link|url|posting/i,
+    notes: /note|comment|remark/i
+  };
+
+  var importHeaders = [];
+  var importRawRows = [];
+  var importMapping = {};
+  var importParsedRows = [];
+
+  function showToast(msg){
+    toastEl.textContent = msg;
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.hidden = true; }, 5000);
+  }
+
+  function pad2(n){ n = String(n); return n.length < 2 ? "0" + n : n; }
+
+  function normalizeDate(v){
+    if(v == null || v === "") return "";
+    if(Object.prototype.toString.call(v) === "[object Date]" && !isNaN(v)){
+      var tz = v.getTimezoneOffset() * 60000;
+      return new Date(v - tz).toISOString().slice(0,10);
+    }
+    var s = String(v).trim();
+    var iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if(iso) return iso[1] + "-" + pad2(iso[2]) + "-" + pad2(iso[3]);
+    var dmy = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+    if(dmy){
+      var yr = dmy[3].length === 2 ? "20" + dmy[3] : dmy[3];
+      return yr + "-" + pad2(dmy[2]) + "-" + pad2(dmy[1]);
+    }
+    var parsed = new Date(s);
+    if(!isNaN(parsed)) return normalizeDate(parsed);
+    return "";
+  }
+
+  function normalizeStatus(v){
+    var s = String(v || "").trim().toLowerCase();
+    if(!s) return "";
+    for(var i=0;i<STATUSES.length;i++){
+      if(STATUSES[i] === s || STATUS_LABEL[STATUSES[i]].toLowerCase() === s) return STATUSES[i];
+    }
+    if(/interview/.test(s)) return "interview";
+    if(/offer/.test(s)) return "offer";
+    if(/reject|declin/.test(s)) return "rejected";
+    if(/withdraw/.test(s)) return "withdrawn";
+    if(/ghost/.test(s)) return "ghosted";
+    if(/appl/.test(s)) return "applied";
+    return "";
+  }
+
+  function openImportOverlay(){ importOverlay.hidden = false; }
+  function closeImportOverlay(){
+    importOverlay.hidden = true;
+    importHeaders = []; importRawRows = []; importMapping = {}; importParsedRows = [];
+    importProgress.hidden = true;
+    importCancelBtn.disabled = false;
+  }
+  importCancelBtn.addEventListener("click", closeImportOverlay);
+  importOverlay.addEventListener("click", function(e){ if(e.target === importOverlay) closeImportOverlay(); });
+
+  importBtn.addEventListener("click", function(){
+    if(typeof XLSX === "undefined"){
+      showToast("Couldn't load the file reader — check your internet connection and try again.");
+      return;
+    }
+    importFileInput.value = "";
+    importFileInput.click();
+  });
+
+  function parseFile(file){
+    return new Promise(function(resolve, reject){
+      var isCsv = /\.csv$/i.test(file.name);
+      var reader = new FileReader();
+      reader.onerror = function(){ reject(new Error("couldn't read the file")); };
+      reader.onload = function(){
+        try{
+          var wb = isCsv
+            ? XLSX.read(reader.result, { type:"string" })
+            : XLSX.read(reader.result, { type:"array", cellDates:true });
+          var sheet = wb.Sheets[wb.SheetNames[0]];
+          var rows = XLSX.utils.sheet_to_json(sheet, { defval:"" });
+          var headers = rows.length ? Object.keys(rows[0]) : [];
+          if(!headers.length) throw new Error("no columns found in the first sheet");
+          resolve({ headers:headers, rows:rows });
+        }catch(e){ reject(e); }
+      };
+      if(isCsv) reader.readAsText(file); else reader.readAsArrayBuffer(file);
+    });
+  }
+
+  importFileInput.addEventListener("change", function(){
+    var file = importFileInput.files[0];
+    if(!file) return;
+    openImportOverlay();
+    importStep1.hidden = false; importStep2.hidden = true; importProgress.hidden = true; importConfirmBtn.hidden = true;
+    importStep1.innerHTML = '<p class="import-hint">Reading ' + esc(file.name) + '…</p>';
+    parseFile(file).then(function(result){
+      importHeaders = result.headers;
+      importRawRows = result.rows;
+      importMapping = {};
+      importHeaders.forEach(function(h){
+        var guessed = "";
+        Object.keys(GUESS).forEach(function(key){ if(!guessed && GUESS[key].test(h)) guessed = key; });
+        importMapping[h] = guessed;
+      });
+      defaultDateInput.value = todayISO();
+      renderMappingUI();
+      importStep1.hidden = true; importStep2.hidden = false; importConfirmBtn.hidden = false;
+    }).catch(function(err){
+      importStep1.innerHTML = '<p class="import-hint">Couldn\'t read that file (' + esc(err && err.message ? err.message : "unrecognized format") + '). Try exporting it as .xlsx or .csv.</p>';
+    });
+  });
+
+  function renderMappingUI(){
+    var rowsHtml = importHeaders.map(function(h){
+      var opts = TARGET_FIELDS.map(function(f){
+        return '<option value="' + f.key + '"' + (importMapping[h] === f.key ? " selected" : "") + '>' + f.label + '</option>';
+      }).join("");
+      return '<tr><td>' + esc(h) + '</td><td><select data-map-header="' + esc(h) + '">' + opts + '</select></td></tr>';
+    }).join("");
+    mapTable.innerHTML = '<thead><tr><th>Your column</th><th>Maps to</th></tr></thead><tbody>' + rowsHtml + '</tbody>';
+    recomputePreview();
+  }
+  mapTable.addEventListener("change", function(e){
+    var sel = e.target.closest("[data-map-header]");
+    if(!sel) return;
+    importMapping[sel.getAttribute("data-map-header")] = sel.value;
+    recomputePreview();
+  });
+  defaultStatusSel.addEventListener("change", recomputePreview);
+  defaultDateInput.addEventListener("change", recomputePreview);
+
+  function recomputePreview(){
+    var existingKeys = {};
+    docs.forEach(function(d){
+      existingKeys[(d.company||"").trim().toLowerCase() + "|" + (d.role||"").trim().toLowerCase() + "|" + (d.dateApplied||"")] = true;
+    });
+    var seenInFile = {};
+    var missing = 0, dup = 0, ready = 0;
+    importParsedRows = importRawRows.map(function(raw){
+      var data = {};
+      Object.keys(importMapping).forEach(function(h){
+        var key = importMapping[h];
+        if(!key) return;
+        var v = raw[h];
+        if(key === "dateApplied") v = normalizeDate(v);
+        else if(key === "status") v = normalizeStatus(v);
+        else v = (v == null ? "" : String(v).trim());
+        data[key] = v;
+      });
+      if(!data.status) data.status = defaultStatusSel.value;
+      if(!data.dateApplied) data.dateApplied = defaultDateInput.value || todayISO();
+      data.followUpDate = addDays(data.dateApplied, 3);
+      var isMissing = !data.company || !data.role;
+      var dupKey = (data.company||"").trim().toLowerCase() + "|" + (data.role||"").trim().toLowerCase() + "|" + data.dateApplied;
+      var isDup = !isMissing && (existingKeys[dupKey] || seenInFile[dupKey]);
+      if(!isMissing) seenInFile[dupKey] = true;
+      if(isMissing) missing++; else if(isDup) dup++; else ready++;
+      return { data:data, missing:isMissing, duplicate:isDup };
+    });
+
+    importSummary.innerHTML = "<b>" + ready + "</b> ready to import" +
+      (dup ? ", <b>" + dup + "</b> already tracked (skipped)" : "") +
+      (missing ? ", <b>" + missing + "</b> missing company or role (skipped)" : "") +
+      " — " + importRawRows.length + " rows found in the file.";
+
+    var previewRows = importParsedRows.slice(0, 6);
+    previewHint.textContent = "Preview (first " + previewRows.length + " of " + importRawRows.length + " rows):";
+    previewTable.innerHTML = '<thead><tr><th>Company</th><th>Role</th><th>Status</th><th>Applied</th><th></th></tr></thead><tbody>' +
+      previewRows.map(function(r){
+        var flag = r.missing ? '<span class="muted">missing fields</span>' : (r.duplicate ? '<span class="muted">duplicate</span>' : "");
+        return '<tr' + (r.missing || r.duplicate ? ' class="row-skip"' : "") + '><td>' + esc(r.data.company || "—") + '</td><td>' + esc(r.data.role || "—") + '</td><td>' + esc(STATUS_LABEL[r.data.status] || r.data.status || "—") + '</td><td class="mono">' + fmtDate(r.data.dateApplied) + '</td><td>' + flag + '</td></tr>';
+      }).join("") + '</tbody>';
+
+    importConfirmBtn.textContent = ready ? ("Import " + ready + " application" + (ready === 1 ? "" : "s")) : "Nothing to import";
+    importConfirmBtn.disabled = !ready;
+  }
+
+  importConfirmBtn.addEventListener("click", function(){
+    var toImport = importParsedRows.filter(function(r){ return !r.missing && !r.duplicate; });
+    if(!toImport.length) return;
+    importStep2.hidden = true; importConfirmBtn.hidden = true; importCancelBtn.disabled = true;
+    importProgress.hidden = false;
+    var progressFill = document.getElementById("progressFill");
+    var progressLabel = document.getElementById("progressLabel");
+    toImport.forEach(function(r){
+      docs.push(Object.assign({}, r.data, { id:newId() }));
+    });
+    saveDocs(docs);
+    sortDocs();
+    progressFill.style.width = "100%";
+    progressLabel.textContent = "Imported " + toImport.length + " of " + toImport.length + ".";
+    render();
+    autoGhostCheck();
+    importCancelBtn.disabled = false;
+    closeImportOverlay();
+    showToast("Imported " + toImport.length + " application" + (toImport.length === 1 ? "" : "s") + ".");
+  });
+
+  // ---- auto-ghost: applications left on "Applied" past the threshold quietly become "Ghosted" ----
+  function autoGhostCheck(){
+    var threshold = daysAgo(GHOST_AFTER_DAYS);
+    var changed = false;
+    docs.forEach(function(d){
+      if(d.status === "applied" && d.dateApplied && d.dateApplied <= threshold){
+        d.status = "ghosted";
+        changed = true;
+      }
+    });
+    if(changed){ saveDocs(docs); render(); }
+  }
+
+  // ---- keep multiple tabs of this same file in sync ----
+  window.addEventListener("storage", function(e){
+    if(e.key !== STORAGE_KEY) return;
+    docs = loadDocs();
+    sortDocs();
+    render();
+  });
+
+  // ---- init ----
+  renderFilterPills();
+  docs = loadDocs();
+  sortDocs();
+  render();
+  autoGhostCheck();
+})();
+</script>
+</body>
+</html>
